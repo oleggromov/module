@@ -1,23 +1,12 @@
 (function (global, undefined) {
     var _modules = {};
+    var _loading = {};
+    var _imports = [];
 
-    var _state = {};
-
-    var _start;
-
-    function imp (dep, cb) {
-        if (!_start) {
-            _start = Date.now();
+    function each (arr, callback) {
+        for (var i = 0; i < arr.length; i++) {
+            callback(arr[i], i);
         }
-
-        load(dep, function () {
-            console.log('all loaded ' + (Date.now() - _start));
-            cb.apply(global, [_modules[dep]]);
-        });
-    }
-
-    function exp (name, exported) {
-        _modules[name] = exported;
     }
 
     function load (src, callback) {
@@ -25,13 +14,54 @@
         script.src = src;
         script.async = true;
         script.onload = function () {
-            console.log(src + ' loaded ' + (Date.now() - _start));
             global.document.body.removeChild(script);
-            callback();
+            callback(src);
         }
         global.document.body.appendChild(script);
     }
 
-    global.imp = imp;
-    global.exp = exp;
+    function loadOnce (dependency) {
+        if (!_loading[dependency]) {
+            _loading[dependency] = true;
+            load(dependency, checkImports);
+        }
+    }
+
+    function getArguments (dependencies) {
+        var params = [];
+        each(dependencies, function (dep) {
+            params.push(_modules[dep]);
+        });
+        return params;
+    }
+
+    function checkImports (src) {
+        each(_imports, function (imp, index) {
+            var fulfilled = true;
+
+            each(imp.dependencies, function (dep) {
+                if (!_modules[dep]) {
+                    fulfilled = false;
+                }
+            });
+
+            if (fulfilled) {
+                imp.callback.apply(undefined, getArguments(imp.dependencies));
+                _imports.splice(index, 1);
+            }
+        });
+    }
+
+    global.imp = function (dependencies, callback) {
+        _imports.push({
+            callback: callback,
+            dependencies: dependencies
+        });
+
+        each(dependencies, loadOnce);
+    };
+
+    global.exp = function (name, exported) {
+        _modules[name] = exported;
+    };
 })(window);
