@@ -1,113 +1,100 @@
 (function (global, undefined) {
     "use strict";
 
-    /**
-     * Module import function. Use it to declare
-     * dependencies (as the first argument) and module body (the second one).
-     *
-     * @param {Array} dependencies Array of dependencies (paths) to load.
-     * @param {Function} callback Module body.
-     */
-    global.imp = function (dependencies, callback) {
-        _imports.push({
-            callback: callback,
-            dependencies: dependencies
-        });
-
-        console.log(dependencies, _imports);
-
-        each(dependencies, loadOnce);
-    };
-
-    /**
-     * Module export function.
-     *
-     * @param  {[type]} name     [description]
-     * @param  {[type]} exported [description]
-     * @return {[type]}          [description]
-     */
-    global.exp = function (name, exported) {
-        _state[name] = _LOADED;
-        _modules[name] = exported;
-    };
-
-
-    /**
-     * Private part.
-     */
-
     var _modules = {};
-    var _state = {};
-    var _imports = [];
+    var _dependents = [];
 
-    var _UNKNOWN = undefined;
-    var _WAITING = 1;
-    var _LOADED = 2;
+    global.imp = function (sources, callback) {
+        var dependent = new Dependent(callback, sources);
+        _dependents.push(dependent);
 
-    function each (arr, callback) {
-        for (var i = 0; i < arr.length; i++) {
-            callback(arr[i], i);
-        }
-    }
+        while (sources.length) {
+            var src = sources.shift();
 
-    function flatten (arr) {
-        var flat = [];
-        each(arr, function (item) {
-            if (item) {
-                flat.push(item);
+            if (!_modules[src]) {
+                _modules[src] = new Module(src);
             }
-        });
-        return flat;
-    }
 
-    function load (src, callback) {
-        var script = global.document.createElement('script');
-        script.src = src;
-        script.async = true;
-        script.onload = function () {
-            global.document.body.removeChild(script);
-            callback(src);
+            _modules[src].addDependent(dependent);
         }
-        global.document.body.appendChild(script);
-    }
+    };
 
-    function loadOnce (dependency) {
-        if (_state[dependency] === _UNKNOWN) {
-            _state[dependency] = _WAITING;
-            load(dependency, checkImports);
-        } else if (_state[dependency] === _LOADED) {
-            checkImports();
+    global.exp = function (src, body) {
+        if (!_modules[src]) {
+            throw new Error('module ' + src + ' was not imported!');
         }
+
+        _modules[src].addBody(body);
+    };
+
+    function Dependent (callback, sources) {
+        this._bodies = [];
+        this._sources = sources.slice();
+        this._statuses = new Array(this._sources.length);
+        this._callback = callback;
     }
 
-    function getArguments (dependencies) {
-        var params = [];
-        each(dependencies, function (dep) {
-            params.push(_modules[dep]);
-        });
-        return params;
+    Dependent.prototype = {
+        notify: function (source, body) {
+            for (var i = 0; i < this._sources.length; i++) {
+                if (this._sources[i] === source) {
+                    this._bodies[i] = body;
+                    this._statuses[i] = true;
+                }
+            }
+
+            this._check();
+        },
+
+        _check: function () {
+            for (var i = 0; i < this._statuses.length; i++) {
+                if (!this._statuses[i]) {
+                    return;
+                }
+            }
+
+            this._callback.apply(undefined, this._bodies);
+        }
+    };
+
+    function Module (src) {
+        this._dependents = [];
+        this._src = src;
+        // this._loaded = false;
+        // this._script = undefined;
+        // this._body = undefined;
+
+        this._load();
     }
 
-    function checkImports () {
-        each(_imports, function (imp, index) {
-            if (!imp) {
+    Module.prototype = {
+        addDependent: function (dependent) {
+            if (!this._loaded) {
+                this._dependents.push(dependent);
                 return;
             }
 
-            var fulfilled = true;
+            dependent.notify(this._src, this._body);
+        },
 
-            each(imp.dependencies, function (dep) {
-                if (_state[dep] !== _LOADED) {
-                    fulfilled = false;
-                }
-            });
+        addBody: function (body) {
+            this._loaded = true;
+            this._body = body;
 
-            if (fulfilled) {
-                imp.callback.apply(undefined, getArguments(imp.dependencies));
-                _imports[index] = undefined;
+            this._doc.body.removeChild(this._script);
+
+            while (this._dependents.length) {
+                this._dependents.shift().notify(this._src, this._body);
             }
-        });
+        },
 
-        _imports = flatten(_imports);
-    }
+        _doc: global.document,
+
+        _load: function () {
+            this._script = this._doc.createElement('script');
+            this._script.src = this._src;
+            this._script.async = true;
+            this._doc.body.appendChild(this._script);
+        }
+    };
 })(window);
