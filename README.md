@@ -7,5 +7,6 @@
 * single dependency (string) support
 * load error handling
 * make code testable and write tests
+	* make objects loose linked
 * think about configuring modules by config
 * export namespaced interface, not single functions
