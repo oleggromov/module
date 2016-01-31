@@ -3,8 +3,6 @@
 
     var _modules = [];
 
-    window.modules = _modules;
-
     function module (name, dependencies, callback) {
         if (!_modules[name]) {
             _modules[name] = new Module(name, dependencies, callback);
