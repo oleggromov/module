@@ -7,6 +7,9 @@
         if (!_modules[name]) {
             _modules[name] = new Module(name, dependencies, callback);
         } else {
+            if (_modules[name].isLoaded()) {
+                throw new Error('Module `' + name + '` is trying to initialize twice.');
+            }
             _modules[name].setLoaded(dependencies, callback);
         }
 
@@ -20,10 +23,35 @@
                 _modules[dependency].addDependent(_modules[name]);
             });
         }
+
+        if (_checkCircular(name)) {
+            throw new Error('Module `' + name + '` is depending on itself through a circular link.');
+        }
     }
 
     module.path = '/modules/';
     module.extension = '.js';
+
+    function _checkCircular (name) {
+        var start = _modules[name];
+        var links = [];
+        var currentName;
+
+        var links = links.concat(_modules[name]._depNames);
+        while (links.length) {
+            currentName = links.shift();
+
+            if (_modules[currentName].getName() === name) {
+                return true;
+            }
+
+            if (_modules[currentName]._depNames) {
+                links = links.concat(_modules[currentName]._depNames);
+            }
+        }
+
+        return false;
+    }
 
     function Module (name, depNames, callback) {
         this._name = name;
