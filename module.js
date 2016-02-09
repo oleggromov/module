@@ -1,135 +1,149 @@
 (function (global, undefined) {
     "use strict";
 
-    var _modules = [];
+    /**
+     * PubSub implementation from https://github.com/oleggromov/pubsub
+     */
+    function PubSub () {
+        this._events = {};
+    }
 
-    function module (name, dependencies, callback) {
+    PubSub.prototype = {
+        on: function (event, callback) {
+            if (!this._events[event]) {
+                this._events[event] = [];
+            }
+
+            this._events[event].push(callback);
+        },
+
+        once: function (event, callback) {
+            var cb = (function () {
+                callback.apply(undefined, arguments);
+                this.off(event, cb);
+            }).bind(this);
+
+            this.on(event, cb);
+        },
+
+        off: function (event, callback) {
+            if (this._events[event]) {
+                var index = this._events[event].indexOf(callback);
+                this._events[event][index] = undefined;
+            }
+        },
+
+        emit: function (event) {
+            var args = Array.prototype.slice.call(arguments, 1);
+
+            if (this._events[event]) {
+                this._events[event].forEach(function (callback) {
+                    if (typeof callback === 'function') {
+                        callback.apply(undefined, args);
+                    }
+                });
+            }
+        }
+    };
+
+    var _events = new PubSub;
+    var _modules = {};
+
+    function load (name, dependencies, callback) {
         if (!_modules[name]) {
-            _modules[name] = new Module(name, dependencies, callback);
+            _modules[name] = new Module(name, _events, dependencies, callback);
         } else {
-            if (_modules[name].isLoaded()) {
-                throw new Error('Module `' + name + '` is trying to initialize twice.');
+            _events.emit('load ' + name, dependencies, callback);
+        }
+
+        dependencies.forEach(function(name) {
+            if (!_modules[name]) {
+                _modules[name] = new Module(name, _events);
             }
-            _modules[name].setLoaded(dependencies, callback);
-        }
-
-        if (!dependencies.length) {
-            _modules[name].init();
-        } else {
-            dependencies.forEach(function (dependency) {
-                if (!_modules[dependency]) {
-                    _modules[dependency] = new Module(dependency);
-                }
-                _modules[dependency].addDependent(_modules[name]);
-            });
-        }
-
-        if (_checkCircular(name)) {
-            throw new Error('Module `' + name + '` is depending on itself through a circular link.');
-        }
+        });
     }
 
-    module.path = '/modules/';
-    module.extension = '.js';
+    load.PATH = '/modules/';
+    load.EXTENSION = '.js';
 
-    function _checkCircular (name) {
-        var start = _modules[name];
-        var links = [];
-        var currentName;
-
-        var links = links.concat(_modules[name]._depNames);
-        while (links.length) {
-            currentName = links.shift();
-
-            if (_modules[currentName].getName() === name) {
-                return true;
-            }
-
-            if (_modules[currentName]._depNames) {
-                links = links.concat(_modules[currentName]._depNames);
-            }
-        }
-
-        return false;
-    }
-
-    function Module (name, depNames, callback) {
+    function Module (name, events, dependencies, callback) {
         this._name = name;
-        this._dependents = [];
+        this._events = events;
 
         if (callback) {
-            this.setLoaded(depNames, callback);
+            this._fill(dependencies, callback);
         } else {
+            this._fill = this._fill.bind(this);
+            this._events.once('load ' + this._name, this._fill);
             this._load();
         }
     }
 
     Module.prototype = {
-        init: function () {
-            var args = this._dependencies.map(function (dependency) {
-                return dependency.getBody();
-            });
-
-            this._body = this._callback.apply(undefined, args);
-
-            while (this._dependents.length) {
-                this._dependents.shift().notify(this);
-            }
-        },
-
-        setLoaded: function (depNames, callback) {
-            this._loaded = true;
-            this._depNames = depNames;
-            this._dependencies = new Array(depNames.length);
+        _fill: function (dependencies, callback) {
+            this._dependencies = dependencies;
             this._callback = callback;
+            this._wait();
         },
 
-        notify: function (dependency) {
-            var index = this._depNames.indexOf(dependency.getName());
-            if (index !== -1) {
-                this._dependencies[index] = dependency;
-                if (this._areDependenciesLoaded()) {
-                    this.init();
+        _wait: function () {
+            if (this._dependencies.length) {
+                this._waits = {};
+                this._arguments = [];
+                this._supply = this._supply.bind(this);
+                this._dependencies.forEach(function (name, index) {
+                    this._waits[name] = {
+                        index: index,
+                        loaded: false,
+                        body: undefined
+                    };
+
+                    this._events.once('ready ' + name, this._supply);
+                    this._events.emit('ping ' + name);
+                }, this);
+            } else {
+                this._run();
+            }
+        },
+
+        _supply: function (name, body) {
+            this._waits[name].loaded = true;
+            this._waits[name].body = body;
+            this._check();
+        },
+
+        _check: function () {
+            var fullfilled = true;
+
+            for (var name in this._waits) {
+                if (this._waits[name].loaded) {
+                    this._arguments[this._waits[name].index] = this._waits[name].body;
+                } else {
+                    fullfilled = false;
                 }
             }
-        },
 
-        addDependent: function (module) {
-            if (!this._loaded) {
-                this._dependents.push(module);
-                return;
+            if (fullfilled) {
+                this._run();
             }
-
-            module.notify(this);
         },
 
-        getName: function () {
-            return this._name;
+        _run: function () {
+            this._body = this._callback.apply(undefined, this._arguments);
+            this._pong = this._pong.bind(this);
+            this._events.on('ping ' + this._name, this._pong);
+            this._pong();
         },
 
-        getBody: function () {
-            return this._body;
-        },
-
-        isLoaded: function () {
-            return this._loaded;
-        },
-
-        _areDependenciesLoaded: function () {
-            for (var i = 0; i < this._dependencies.length; i++) {
-                if (!this._dependencies[i] || !this._dependencies[i].isLoaded()) {
-                    return false;
-                }
-            }
-
-            return true;
+        _pong: function () {
+            this._events.emit('ready ' + this._name, this._name, this._body);
         },
 
         _doc: global.document,
 
         _load: function () {
             this._script = this._doc.createElement('script');
-            this._script.src = module.path + this._name + module.extension;
+            this._script.src = load.PATH + this._name + load.EXTENSION;
             this._script.async = true;
             this._script.onload = (function () {
                 this._doc.body.removeChild(this._script);
@@ -139,5 +153,5 @@
     };
 
     // Exporting interface.
-    global.module = module;
+    global.module = load;
 })(window);
