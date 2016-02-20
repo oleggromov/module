@@ -8,6 +8,6 @@
   "scripts": {
     "browserify": "node_modules/browserify/bin/cmd.js module.js > build/module.js",
     "uglify": "node_modules/uglify-js/bin/uglifyjs build/module.js -o build/module.min.js",
-    "build": "rm build/* && npm run browserify && npm run uglify"
+    "build": "md -p build && rm build/* && npm run browserify && npm run uglify"
   }
 }
