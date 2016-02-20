@@ -1,6 +1,5 @@
 # TODO
 
-* drag the _load method outside of the Module class
 * make code testable and write tests
 * move PubSub dependency outwards
 * decide if it is useful to handle module dynamic reloading and what to do in that case

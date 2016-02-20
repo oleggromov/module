@@ -49,9 +49,13 @@
     var _events = new PubSub;
     var _modules = {};
 
-    function load (name, dependencies, callback) {
+    function module (name, dependencies, callback) {
         if (!_modules[name]) {
             _modules[name] = new Module(name, _events, dependencies, callback);
+
+            if (!callback) {
+                load(name);
+            }
         } else {
             _events.emit('load ' + name, dependencies, callback);
         }
@@ -59,12 +63,30 @@
         dependencies.forEach(function(name) {
             if (!_modules[name]) {
                 _modules[name] = new Module(name, _events);
+                load(name);
             }
         });
     }
 
-    load.PATH = '/modules/';
-    load.EXTENSION = '.js';
+    module.PATH = '/modules/';
+    module.EXTENSION = '.js';
+
+    function load (name) {
+        var doc = global.document;
+        var script = doc.createElement('script');
+
+        script.src = module.PATH + name + module.EXTENSION;
+        script.async = true;
+        script.onload = function () {
+            doc.body.removeChild(script);
+        };
+
+        doc.body.appendChild(script);
+    }
+
+    // Exporting interface.
+    global.module = module;
+
 
     function Module (name, events, dependencies, callback) {
         this._name = name;
@@ -74,7 +96,6 @@
             this._fill(dependencies, callback);
         } else {
             this._events.once('load ' + this._name, this._fill.bind(this));
-            this._load();
         }
     }
 
@@ -125,21 +146,6 @@
 
         _pong: function () {
             this._events.emit('ready ' + this._name, this._name, this._body);
-        },
-
-        _doc: global.document,
-
-        _load: function () {
-            this._script = this._doc.createElement('script');
-            this._script.src = load.PATH + this._name + load.EXTENSION;
-            this._script.async = true;
-            this._script.onload = (function () {
-                this._doc.body.removeChild(this._script);
-            }).bind(this);
-            this._doc.body.appendChild(this._script);
         }
     };
-
-    // Exporting interface.
-    global.module = load;
 })(window);
