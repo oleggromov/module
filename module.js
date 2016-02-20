@@ -94,8 +94,7 @@
                 this._dependencies.forEach(function (name, index) {
                     this._waits[name] = {
                         index: index,
-                        loaded: false,
-                        body: undefined
+                        loaded: false
                     };
 
                     this._events.once('ready ' + name, this._supply);
@@ -108,24 +107,18 @@
 
         _supply: function (name, body) {
             this._waits[name].loaded = true;
-            this._waits[name].body = body;
+            this._arguments[this._waits[name].index] = body;
             this._check();
         },
 
         _check: function () {
-            var fullfilled = true;
-
-            for (var name in this._waits) {
-                if (this._waits[name].loaded) {
-                    this._arguments[this._waits[name].index] = this._waits[name].body;
-                } else {
-                    fullfilled = false;
+            for (var dep in this._waits) {
+                if (!this._waits[dep].loaded) {
+                    return;
                 }
             }
 
-            if (fullfilled) {
-                this._run();
-            }
+            this._run();
         },
 
         _run: function () {
