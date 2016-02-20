@@ -73,8 +73,7 @@
         if (callback) {
             this._fill(dependencies, callback);
         } else {
-            this._fill = this._fill.bind(this);
-            this._events.once('load ' + this._name, this._fill);
+            this._events.once('load ' + this._name, this._fill.bind(this));
             this._load();
         }
     }
@@ -87,38 +86,34 @@
         },
 
         _wait: function () {
-            if (this._dependencies.length) {
-                this._waits = {};
-                this._arguments = [];
-                this._supply = this._supply.bind(this);
-                this._dependencies.forEach(function (name, index) {
-                    this._waits[name] = {
-                        index: index,
-                        loaded: false
-                    };
+            this._arguments = [];
+            this._waits = [];
+            this._dependencies.forEach(function (name) {
+                this._waits.push(false);
+                this._events.once('ready ' + name, this._supply.bind(this));
+                this._events.emit('ping ' + name);
+            }, this);
 
-                    this._events.once('ready ' + name, this._supply);
-                    this._events.emit('ping ' + name);
-                }, this);
-            } else {
+            if (!this._waits.length) {
                 this._run();
             }
         },
 
         _supply: function (name, body) {
-            this._waits[name].loaded = true;
-            this._arguments[this._waits[name].index] = body;
+            var index = this._dependencies.indexOf(name);
+            this._waits[index] = true;
+            this._arguments[index] = body;
             this._check();
         },
 
         _check: function () {
-            for (var dep in this._waits) {
-                if (!this._waits[dep].loaded) {
-                    return;
-                }
-            }
+            var fullfilled = this._waits.reduce(function(prev, cur) {
+                return prev && cur;
+            }, true);
 
-            this._run();
+            if (fullfilled) {
+                this._run();
+            }
         },
 
         _run: function () {
