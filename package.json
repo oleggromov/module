@@ -3,12 +3,15 @@
   "version": "0.0.1",
   "devDependencies": {
     "browserify": "^13.0.0",
+    "chai": "^3.5.0",
+    "sinon": "^1.17.3",
     "true-pubsub": "^1.0.0",
     "uglify-js": "^2.6.1"
   },
   "scripts": {
     "browserify": "node_modules/browserify/bin/cmd.js module.js > build/module.js",
     "uglify": "node_modules/uglify-js/bin/uglifyjs build/module.js -o build/module.min.js",
-    "build": "mkdir -p build && rm build/* && npm run browserify && npm run uglify"
+    "build": "mkdir -p build && rm build/* && npm run browserify && npm run uglify",
+    "test": "mocha"
   }
 }
