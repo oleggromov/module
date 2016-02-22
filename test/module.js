@@ -44,5 +44,25 @@ describe('Module', function () {
         });
     });
 
+    describe('waiting for load without dependencies', function () {
+        var module;
 
+        beforeEach(function () {
+            module = new Module('waiting', pubsub);
+        });
+
+        it('starts to listen `load` event for itself', function () {
+            expect(pubsub.once.getCall(0).args[0]).to.equal('load waiting');
+        });
+
+        it('passes some function as the `load` event listener', function () {
+            expect(pubsub.once.getCall(0).args[1]).to.be.a('function');
+        });
+
+        it('fires `ready` event on that function call', function () {
+            var onload = pubsub.once.getCall(0).args[1];
+            onload([], function () {});
+            expect(pubsub.emit.getCall(0).args[0]).to.equal('ready waiting');
+        });
+    });
 });
