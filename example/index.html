@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Modules test</title>
+</head>
+<body>
+    <script src="/module/build/module.min.js"></script>
+    <script>
+    module.configure('PATH', '/module/example/');
+    module('app', ['a', 'b', 'c'], function (a) {
+        console.warn('App', a);
+    });
+
+    // module('test', ['b', 'c'], function (b, c) {
+    //     console.warn('Test', b, c);
+    // });
+
+    // module('app2', ['a', 'b'], function (a, b) {
+    //     console.warn('App-2', a, b);
+    // });
+    </script>
+</body>
+</html>
