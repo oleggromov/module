@@ -56,7 +56,7 @@ describe('interface (globally exported `module` function)', function () {
             expect(module.getCall(0).args[0]).to.equal('sample_module');
         });
 
-        it('passes a common pubsub instance to it', function () {
+        it('passes common pubsub instance to it', function () {
             expect(module.getCall(0).args[1]).to.equal(pubsub);
         });
 
@@ -87,6 +87,36 @@ describe('interface (globally exported `module` function)', function () {
 
         it('passes to it the original callback', function () {
             expect(pubsub.emit.getCall(0).args[2]).to.equal(cb);
+        });
+    });
+
+    describe('module with not loaded yet dependencies', function () {
+        beforeEach(function () {
+            fn('dependent_module', ['dep_one', 'dep_two'], function () {});
+        });
+
+        it('creates 3 instances of Module (2+1)', function () {
+            expect(module.callCount).to.equal(3);
+        });
+
+        it('creates Module instance for the first dependency', function () {
+            expect(module.getCall(1).calledWithNew()).to.be.true;
+        });
+
+        it('passes the right name for it', function () {
+            expect(module.getCall(1).args[0]).to.equal('dep_one');
+        });
+
+        it('passes common pubsub instance to it', function () {
+            expect(module.getCall(1).args[1]).to.equal(pubsub);
+        });
+
+        it('invokes `load` twice', function () {
+            expect(load.callCount).to.equal(2);
+        });
+
+        it('passes name of the first dependency', function () {
+            expect(load.getCall(0).args[0]).to.equal('dep_one');
         });
     });
 });
