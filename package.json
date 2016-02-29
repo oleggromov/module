@@ -12,6 +12,6 @@
     "browserify": "node_modules/browserify/bin/cmd.js module.js > build/module.js",
     "uglify": "node_modules/uglify-js/bin/uglifyjs build/module.js -o build/module.min.js",
     "build": "mkdir -p build && rm build/* && npm run browserify && npm run uglify",
-    "test": "mocha"
+    "test": "NODE_ENV=test mocha"
   }
 }
