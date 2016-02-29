@@ -12,3 +12,4 @@
 * load error handling
 * think about configuring modules by config
 * make compilation of modules into bundles possible
+* add .npmignore
