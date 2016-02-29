@@ -40,9 +40,12 @@ describe('interface (globally exported `module` function)', function () {
         });
     });
 
-    describe('not loaded yet (without a callback) module without dependencies', function () {
+    describe('loaded module without dependencies', function () {
+        var cb;
+
         beforeEach(function () {
-            fn('sample_module', []);
+            cb = sinon.spy();
+            fn('sample_module', [], cb);
         });
 
         it('creates new Module instance', function () {
@@ -57,12 +60,33 @@ describe('interface (globally exported `module` function)', function () {
             expect(module.getCall(0).args[1]).to.equal(pubsub);
         });
 
-        it('invokes loading function', function () {
-            expect(load.callCount).to.equal(1);
+        it('passes callback to the instance', function () {
+            expect(module.getCall(0).args[3]).to.equal(cb);
         });
 
-        it('passes module name to load function', function () {
-            expect(load.getCall(0).args[0]).to.equal('sample_module');
+        it('doesn\'t call callback explicitly', function () {
+            expect(cb.callCount).to.be.zero;
+        });
+    });
+
+    describe('not loaded yet module', function () {
+        var cb = function () {};
+
+        beforeEach(function () {
+            fn('loaded_module', []);
+            fn('loaded_module', [], cb);
+        });
+
+        it('emits `load` event when the callback is passed', function () {
+            expect(pubsub.emit.getCall(0).args[0]).to.equal('load loaded_module');
+        });
+
+        it('emits event only once', function () {
+            expect(pubsub.emit.callCount).to.equal(1);
+        });
+
+        it('passes to it the original callback', function () {
+            expect(pubsub.emit.getCall(0).args[2]).to.equal(cb);
         });
     });
 });
