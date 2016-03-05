@@ -15,3 +15,4 @@
 * think about configuring modules by config
 * make compilation of modules into bundles possible
 * add .npmignore
+* support [AMD.js specification](https://github.com/amdjs/amdjs-api/)
